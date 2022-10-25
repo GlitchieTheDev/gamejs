@@ -51,6 +51,7 @@ gameJs.newGame = (dimensions) => {
     game.mouse = {
         position: {}
     }
+    game.vars = {}
     game.vector2 = {} // Second dimension
     game.vector3 = {} // Third dimension
 
