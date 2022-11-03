@@ -48,10 +48,13 @@ gameJs.newGame = (dimensions) => {
     game.domElement = document.createElement("canvas")
     game.elements = {}
     game.timer = 0
+    game.helper = {}
     game.mouse = {
         position: {}
     }
     game.vars = {}
+    game.sprites = {}
+    game.sprites.sprites = []
     game.vector2 = {} // Second dimension
     game.vector3 = {} // Third dimension
 
@@ -59,8 +62,6 @@ gameJs.newGame = (dimensions) => {
     game.__events = {}
     game.__ctx = game.domElement.getContext("2d")
     game.__keyBinds = {}
-
-    game.__ctx.translate(0.5, 0.5)
 
     // Starters
     game.domElement.width = window.innerWidth
@@ -89,6 +90,14 @@ gameJs.newGame = (dimensions) => {
                 game.__events[event][i](...args)
             }
         }
+    }
+    game.helper.degToRad = (deg) => {
+        let rad = (deg * Math.PI) / 180
+        return rad
+    }
+    game.helper.radToDeg = (rad) => {
+        let deg = rad * 180 / Math.PI
+        return deg
     }
     game.start = () => {
         game.emit("start")
@@ -127,6 +136,51 @@ gameJs.newGame = (dimensions) => {
     game.mouse.unlock = () => {
         game.domElement.exitPointerLock()
     }
+    game.sprites.new = () => {
+        let sprite = {}
+        sprite.costumes = []
+        sprite.costumes.push("https://seeklogo.com/images/S/scratchcat-logo-8C25C25983-seeklogo.com.png")
+
+        sprite.motion = { position: game.vector2.new(0,0), direction: 0 }
+        sprite.looks = { layer: game.sprites.sprites.length, costume: 1, size: 100}
+        sprite.sound = {}
+        sprite.events = {}
+        sprite.control = {}
+        sprite.sensing = {}
+        sprite.operators = {}
+        sprite.var = {}
+
+        sprite.motion.moveSteps = (x) => {
+            const radians = game.helper.degToRad(0 - sprite.motion.direction)
+            const dx = x * Math.cos(radians)
+            const dy = x * Math.sin(radians)
+            // util.target.setXY(sprite.motion.position.x + dx, sprite.motion.position.y + dy)
+            sprite.motion.position.x = sprite.motion.position.x + dx
+            sprite.motion.position.y = sprite.motion.position.y + dy
+        }
+        sprite.motion.pointTowards = (target) => {
+            let targetX = 0
+            let targetY = 0
+            if (target === "mouse") {
+                targetX = game.mouse.position.x
+                targetY = game.mouse.position.y
+            } else if (target === "random") {
+                sprite.motion.direction = Math.round(Math.random() * 360) - 180
+                return;
+            } else {
+
+            }
+
+            const dx = targetX - sprite.motion.position.x
+            const dy = targetY - sprite.motion.position.y
+            const direction = 0 - game.helper.radToDeg(Math.atan2(dy, dx))
+            sprite.motion.direction = direction
+        }
+
+        game.sprites.sprites.push(sprite)
+
+        return sprite
+    }
 
     // Listeners
     document.addEventListener("keydown", (e) => {
@@ -154,6 +208,27 @@ gameJs.newGame = (dimensions) => {
     })
     document.addEventListener('focus', (event) => {
         event.target.style.background = 'pink';
-      });
+    });
+
+    // Handler
+    game.on("__renderFrame", () => {
+        for (let sprite of game.sprites.sprites) {
+            let img = document.createElement("img")
+            // img.crossOrigin="anonymous"
+            img.src = sprite.costumes[sprite.looks.costume-1]
+            game.__ctx.translate(sprite.motion.position.x, sprite.motion.position.y)
+            game.__ctx.rotate(game.helper.degToRad(sprite.motion.direction))
+            game.__ctx.drawImage(img, sprite.looks.size * -0.5, sprite.looks.size * -0.5, sprite.looks.size, sprite.looks.size)
+            game.__ctx.resetTransform()
+        }
+    })
+    game.on("heartbeat", () => {
+        game.__ctx.fillStyle = "#ffffff"
+        game.__ctx.translate(0.5, 0.5)
+        game.__ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)
+        game.emit("__renderFrame")
+    })
+
+
     return game
 }
