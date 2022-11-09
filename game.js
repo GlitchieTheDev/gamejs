@@ -40,13 +40,11 @@
 
 let gameJs = {}
 
-gameJs.newGame = (dimensions) => {
+gameJs.newGame = () => {
     let game = {}
 
     // Properties
-    game.dimensions = dimensions
     game.domElement = document.createElement("canvas")
-    game.elements = {}
     game.timer = 0
     game.helper = {}
     game.mouse = {
@@ -55,6 +53,10 @@ gameJs.newGame = (dimensions) => {
     game.vars = {}
     game.sprites = {}
     game.sprites.sprites = []
+    game.settings = {
+        autoResize: true,
+        dimensions: "2d"
+    }
     game.vector2 = {} // Second dimension
     game.vector3 = {} // Third dimension
 
@@ -68,12 +70,30 @@ gameJs.newGame = (dimensions) => {
     game.domElement.height = window.innerHeight
 
     // Methods
-    game.vector2.new = (x,y) => {
-        let table = {x,y}
+    game.wait = (ms) => {
+        let start = new Date().getTime()
+        while (true) {
+            if ((new Date().getTime() - start) >= ms) {
+                break;
+            }
+        }
+    }
+    game.sepThread = (fn) => {
+        setTimeout(() => fn(), 0)
+    }
+    game.vector2.new = (x, y) => {
+        let table = {
+            x,
+            y
+        }
         return table
     }
-    game.vector3.new = (x,y,z) => {
-        let table = {x,y,z}
+    game.vector3.new = (x, y, z) => {
+        let table = {
+            x,
+            y,
+            z
+        }
         return table
     }
     game.on = (event, callback) => {
@@ -119,11 +139,6 @@ gameJs.newGame = (dimensions) => {
             game.__keyBinds[key] = [callback]
         }
     }
-    game.elements.new = (id) => {
-        let elem = "newGameJs" + id + "Element"
-
-        return elem
-    }
     game.mouse.hide = () => {
         game.domElement.style.cursor = "none"
     }
@@ -141,14 +156,51 @@ gameJs.newGame = (dimensions) => {
         sprite.costumes = []
         sprite.costumes.push("https://seeklogo.com/images/S/scratchcat-logo-8C25C25983-seeklogo.com.png")
 
-        sprite.motion = { position: game.vector2.new(0,0), direction: 0 }
-        sprite.looks = { layer: game.sprites.sprites.length, costume: 1, size: 100}
+        sprite.motion = {
+            position: game.vector2.new(0, 0),
+            direction: 0
+        }
+        sprite.looks = {
+            layer: game.sprites.sprites.length,
+            costume: 1,
+            size: 100,
+            show: true
+        }
         sprite.sound = {}
         sprite.events = {}
         sprite.control = {}
         sprite.sensing = {}
         sprite.operators = {}
         sprite.var = {}
+
+        //----------------------------------------//
+        sprite.__getTargetXY = (targetName) => {
+            let targetX = 0;
+            let targetY = 0;
+            if (targetName === 'mouse') {
+                targetX = game.mouse.position.x
+                targetY = game.mouse.position.y
+            } else if (targetName === 'random') {
+                const stageWidth = game.domElement.width;
+                const stageHeight = game.domElement.height;
+                targetX = Math.round(stageWidth * (Math.random() - 0.5));
+                targetY = Math.round(stageHeight * (Math.random() - 0.5));
+            } else {
+                // targetName = Cast.toString(targetName);
+                // const goToTarget = this.runtime.getSpriteTargetByName(targetName);
+                // if (!goToTarget) return;
+                // targetX = goToTarget.x;
+                // targetY = goToTarget.y;
+            }
+            return {
+                x: targetX,
+                y: targetY
+            };
+        }
+        sprite.__glide = (secs, x, y) => {
+
+        }
+        //----------------------------------------//
 
         sprite.motion.moveSteps = (x) => {
             const radians = game.helper.degToRad(0 - sprite.motion.direction)
@@ -157,6 +209,13 @@ gameJs.newGame = (dimensions) => {
             // util.target.setXY(sprite.motion.position.x + dx, sprite.motion.position.y + dy)
             sprite.motion.position.x = sprite.motion.position.x + dx
             sprite.motion.position.y = sprite.motion.position.y + dy
+        }
+        sprite.motion.goto = (target) => {
+            target = sprite.__getTargetXY(target)
+            sprite.motion.position = game.vector2.new(target.x, target.y)
+        }
+        sprite.motion.gotoXY = (x, y) => {
+            sprite.motion.position = game.vector2.new(x, y)
         }
         sprite.motion.pointTowards = (target) => {
             let targetX = 0
@@ -167,14 +226,11 @@ gameJs.newGame = (dimensions) => {
             } else if (target === "random") {
                 sprite.motion.direction = Math.round(Math.random() * 360) - 180
                 return;
-            } else {
-
-            }
-
-            const dx = targetX - sprite.motion.position.x
-            const dy = targetY - sprite.motion.position.y
-            const direction = 0 - game.helper.radToDeg(Math.atan2(dy, dx))
-            sprite.motion.direction = direction
+            } else {}
+            targetX = targetX - sprite.motion.position.x
+            targetY = targetY - sprite.motion.position.y
+            const direction = Math.atan2(targetY, targetX)/Math.PI*180
+            sprite.motion.direction = (360+Math.round(direction))%360
         }
 
         game.sprites.sprites.push(sprite)
@@ -195,8 +251,10 @@ gameJs.newGame = (dimensions) => {
         // renderer.setSize(window.innerWidth, window.innerHeight)
         // camera.aspect = window.innerWidth / window.innerHeight
         // camera.updateProjectionMatrix()
-        game.domElement.width = window.innerWidth
-        game.domElement.height = window.innerHeight
+        if (game.settings.autoResize) {
+            game.domElement.width = window.innerWidth
+            game.domElement.height = window.innerHeight
+        }
 
     })
     document.addEventListener("mousemove", (e) => {
@@ -213,13 +271,15 @@ gameJs.newGame = (dimensions) => {
     // Handler
     game.on("__renderFrame", () => {
         for (let sprite of game.sprites.sprites) {
-            let img = document.createElement("img")
-            // img.crossOrigin="anonymous"
-            img.src = sprite.costumes[sprite.looks.costume-1]
-            game.__ctx.translate(sprite.motion.position.x, sprite.motion.position.y)
-            game.__ctx.rotate(game.helper.degToRad(sprite.motion.direction))
-            game.__ctx.drawImage(img, sprite.looks.size * -0.5, sprite.looks.size * -0.5, sprite.looks.size, sprite.looks.size)
-            game.__ctx.resetTransform()
+            if (sprite.looks.show) {
+                let img = document.createElement("img")
+                // img.crossOrigin="anonymous"
+                img.src = sprite.costumes[sprite.looks.costume - 1]
+                game.__ctx.translate(sprite.motion.position.x, sprite.motion.position.y)
+                game.__ctx.rotate(game.helper.degToRad(sprite.motion.direction))
+                game.__ctx.drawImage(img, sprite.looks.size * -0.5, sprite.looks.size * -0.5, sprite.looks.size, sprite.looks.size)
+                game.__ctx.resetTransform()
+            }
         }
     })
     game.on("heartbeat", () => {
